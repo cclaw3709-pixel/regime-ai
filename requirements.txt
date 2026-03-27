@@ -5,3 +5,5 @@ yfinance
 xgboost
 shap
 requests
+websocket-client
+schedule
