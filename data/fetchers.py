@@ -7,6 +7,16 @@ from typing import Optional
 import config
 
 
+def _convert_symbol(symbol: str) -> str:
+    """Convert exchange symbol format to Yahoo Finance format."""
+    # BTCUSD -> BTC-USD, ETHUSD -> ETH-USD, etc.
+    if symbol.endswith("USD") and not symbol.startswith("BTC"):
+        return symbol[:-3] + "-USD"
+    if symbol.endswith("USD"):
+        return symbol.replace("USD", "-USD")
+    return symbol
+
+
 def fetch_yahoo_data(
     symbol: str,
     interval: str = "1h",
@@ -26,13 +36,26 @@ def fetch_yahoo_data(
     Returns:
         DataFrame with OHLCV data
     """
-    ticker = yf.Ticker(symbol)
+    yahoo_symbol = _convert_symbol(symbol)
+    ticker = yf.Ticker(yahoo_symbol)
     if start and end:
         df = ticker.history(start=start, end=end, interval=interval)
     else:
         df = ticker.history(period=period, interval=interval)
 
-    df.index = df.index.tz_localize(None) if df.index.tz else df.index
+    if df.empty:
+        raise ValueError(f"No data found for symbol {symbol} (Yahoo: {yahoo_symbol})")
+
+    # Flatten MultiIndex columns if present (yfinance returns multi-level columns)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [col[0].lower() for col in df.columns]
+
+    # Handle timezone - newer pandas returns Index without tz
+    try:
+        if df.index.tzinfo is not None:
+            df.index = df.index.tz_localize(None)
+    except (AttributeError, TypeError):
+        pass
     df.index.name = "timestamp"
     return df
 

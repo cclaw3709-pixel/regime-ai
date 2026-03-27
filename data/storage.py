@@ -44,6 +44,10 @@ def save_data(
     path = get_storage_path(symbol, interval, file_format)
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
+    # Normalize column names to lowercase
+    df = df.copy()
+    df.columns = [c.lower() for c in df.columns]
+
     if append and os.path.exists(path):
         existing = load_data(symbol, interval, file_format)
         if existing is not None:
@@ -86,6 +90,8 @@ def load_data(
     else:
         df = pd.read_parquet(path)
 
+    # Normalize column names to lowercase
+    df.columns = [c.lower() for c in df.columns]
     return df
 
 
@@ -115,11 +121,11 @@ def load_or_fetch(
             # Check if cache is stale
             age = datetime.now() - df.index[-1]
             if age.total_seconds() < config.CACHE_DURATION * 60:
-                print(f"Using cached data for {symbol} ({age:.1f} minutes old)")
+                print(f"Using cached data for {symbol} ({age.total_seconds()/60:.1f} minutes old)")
                 return df
 
     # Fetch fresh data
-    from fetchers import fetch_data
+    from data.fetchers import fetch_data
     df = fetch_data(symbol, interval, period)
 
     # Save to cache
@@ -131,7 +137,7 @@ def load_or_fetch(
 
 if __name__ == "__main__":
     # Test storage
-    from fetchers import fetch_data
+    from data.fetchers import fetch_data
     df = fetch_data("BTCUSD", period="5d")
     path = save_data(df, "BTCUSD", "1h")
     print(f"Saved to {path}")

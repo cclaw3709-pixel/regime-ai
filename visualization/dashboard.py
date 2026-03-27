@@ -9,7 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.patches import FancyArrowMarker
+from matplotlib.markers import MarkerStyle
 import mplfinance as mpf
 import pandas as pd
 import numpy as np
