@@ -14,6 +14,7 @@ from signals.generator import SignalGenerator, generate_signals
 from signals.ml_model import MLSignalGenerator, XGB_AVAILABLE
 from alerts.rules import AlertRulesEngine
 from alerts.notifier import TelegramNotifier
+from visualization.dashboard import generate_dashboard
 
 
 def run_indicator_analysis(symbol: str, interval: str) -> dict:
@@ -188,6 +189,8 @@ def main():
     )
     parser.add_argument("--no-alert", action="store_true", help="Disable Telegram alerts")
     parser.add_argument("--output", type=str, help="Output file for results (JSON)")
+    parser.add_argument("--visualize", action="store_true", help="Generate visualization dashboard")
+    parser.add_argument("--output-dir", type=str, default="output", help="Output directory for charts")
 
     args = parser.parse_args()
 
@@ -216,6 +219,25 @@ def main():
         # Send alert if not disabled
         if not args.no_alert and result["direction"] != "HOLD":
             send_alert(result, shap_features)
+
+        # Generate visualization dashboard if requested
+        if args.visualize:
+            print(f"\n[Visualize] Generating dashboard for {symbol}...")
+            viz_df = load_or_fetch(symbol, args.interval, period="30d")
+            viz_df = compute_all_indicators(viz_df)
+
+            viz_signals = [result] if isinstance(result, dict) else [r for r in [result] if r]
+            viz_shap = shap_features if shap_features else result.get("top_shap_features")
+
+            html_path = generate_dashboard(
+                symbol=symbol,
+                interval=args.interval,
+                output_dir=args.output_dir,
+                df=viz_df,
+                signals=viz_signals,
+                shap_features=viz_shap,
+            )
+            print(f"[Visualize] Dashboard generated: {html_path}")
 
     # Save output if requested
     if args.output:

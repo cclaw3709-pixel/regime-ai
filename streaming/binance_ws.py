@@ -20,11 +20,13 @@ class BinanceWebSocket:
 
     def __init__(self, symbols: List[str], intervals: List[str] = ["1h"],
                  on_signal: Optional[Callable] = None,
-                 on_tick: Optional[Callable] = None):
+                 on_tick: Optional[Callable] = None,
+                 on_visualize: Optional[Callable] = None):
         self.symbols = [s.upper().replace("USD", "USDT") for s in symbols]  # BTCUSD → BTCUSDT
         self.intervals = intervals
         self.on_signal = on_signal
         self.on_tick = on_tick
+        self.on_visualize = on_visualize
         self.running = False
         self._thread: Optional[threading.Thread] = None
         self.latest_data: Dict[str, Dict] = {}  # symbol → {klines, signal}
@@ -120,6 +122,9 @@ class BinanceWebSocket:
 
             if self.on_signal:
                 self.on_signal(symbol, signal, indicators)
+
+            if self.on_visualize:
+                self.on_visualize(symbol, signal, indicators)
 
         except Exception as e:
             print(f"[WS] Signal check error for {symbol}: {e}")

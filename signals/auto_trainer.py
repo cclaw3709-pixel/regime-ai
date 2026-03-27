@@ -1,5 +1,6 @@
 """Auto-retraining scheduler for the ML model."""
 
+import os
 import time
 import threading
 import schedule
@@ -8,6 +9,17 @@ from typing import Optional, List
 import config
 from signals.ml_model import MLSignalGenerator
 import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _get_visualization_module():
+    """Lazy-load visualization to avoid circular imports."""
+    try:
+        from visualization.dashboard import plot_shap_features, generate_dashboard
+        return plot_shap_features, generate_dashboard
+    except ImportError:
+        return None, None
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +59,10 @@ class AutoTrainer:
             self._results[key] = metrics
             print(f"[AutoTrain] ✓ {symbol} ({interval}) trained. "
                   f"Accuracy: {metrics.get('train_accuracy', 0):.2%}")
+
+            # Save SHAP visualization after successful retrain
+            self.save_visualization(symbol, interval)
+
             return metrics
         except Exception as e:
             print(f"[AutoTrain] ✗ {symbol} ({interval}) failed: {e}")
@@ -99,6 +115,53 @@ class AutoTrainer:
     def get_results(self, symbol: str, interval: str) -> Optional[dict]:
         """Get training results for symbol/interval."""
         return self._results.get((symbol, interval))
+
+    def save_visualization(self, symbol: str, interval: str, output_dir: str = "output") -> Optional[str]:
+        """Plot and save SHAP features visualization after retraining.
+
+        Args:
+            symbol: Trading symbol
+            interval: Data interval
+            output_dir: Directory to save visualization
+
+        Returns:
+            Path to saved chart or None if visualization unavailable
+        """
+        plot_shap_features, _ = _get_visualization_module()
+        if plot_shap_features is None:
+            logger.warning("Visualization module not available")
+            return None
+
+        try:
+            model = self.get_model(symbol, interval)
+            if model is None or not hasattr(model, "feature_importances_"):
+                logger.warning(f"No trained model available for {symbol}/{interval}")
+                return None
+
+            # Get feature importances as SHAP-like format
+            shap_features = [
+                (name, float(imp))
+                for name, imp in sorted(
+                    model.feature_importances_.items(),
+                    key=lambda x: abs(x[1]),
+                    reverse=True
+                )
+            ][:10]  # Top 10 features
+
+            if not shap_features:
+                logger.warning(f"No feature importances for {symbol}/{interval}")
+                return None
+
+            save_path = f"{output_dir}/{symbol}_{interval}_shap.png"
+            os.makedirs(output_dir, exist_ok=True)
+
+            plot_shap_features(shap_features, symbol, save_path)
+            print(f"[AutoTrain] Saved SHAP visualization: {save_path}")
+            return save_path
+
+        except Exception as e:
+            logger.error(f"Failed to save visualization for {symbol}/{interval}: {e}")
+            return None
 
 
 if __name__ == "__main__":
