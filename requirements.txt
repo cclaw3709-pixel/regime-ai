@@ -1,0 +1,7 @@
+pandas
+numpy
+pandas_ta
+yfinance
+xgboost
+shap
+requests
